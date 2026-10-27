@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard SAINS v3 — KKKT (Admin Edition)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#fff; --surface:#f4f6f9; --surface2:#eaecf1; --border:#dde1e7;
+  --text:#1a1d23; --muted:#5a6374;
+  --blue:#1d6fcc; --blue-l:#dbeafe;
+  --purple:#6d4bb4; --purple-l:#ede9fe;
+  --green:#15803d; --green-l:#dcfce7;
+  --yellow:#b45309; --yellow-l:#fef3c7;
+  --red:#be123c; --red-l:#ffe4e6;
+  --orange:#c2410c; --orange-l:#ffedd5;
+  --teal:#0e7490; --teal-l:#cffafe;
+  --admin:#7c3aed; --admin-l:#f5f3ff;
+}
+body{font-family:"Segoe UI",-apple-system,system-ui,sans-serif;font-size:14px;line-height:1.6;color:var(--text);background:var(--surface);}
+
+/* ── LOADING ── */
+#ls{position:fixed;inset:0;background:var(--blue);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:#fff;gap:14px;}
+#ls .spin{width:46px;height:46px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#ls p{font-size:16px;font-weight:700;}
+#ls small{font-size:12px;opacity:.6;}
+
+/* ── LOGIN ── */
+#login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#172040 0%,#1d6fcc 100%);display:flex;align-items:center;justify-content:center;z-index:8000;}
+.login-box{background:#fff;border-radius:14px;padding:36px 40px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,.35);}
+.login-icon{font-size:36px;text-align:center;margin-bottom:6px;}
+.login-title{font-size:20px;font-weight:800;text-align:center;color:var(--text);}
+.login-sub{font-size:12px;text-align:center;color:var(--muted);margin-bottom:22px;}
+.lf{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.lf label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+.lf input{border:1px solid var(--border);border-radius:6px;padding:9px 11px;font-size:14px;color:var(--text);outline:none;transition:border-color .15s;}
+.lf input:focus{border-color:var(--blue);}
+.login-btn{width:100%;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;transition:opacity .15s;}
+.login-btn:hover{opacity:.88;}
+.login-err{color:var(--red);font-size:12px;text-align:center;margin-top:8px;min-height:18px;}
+.login-hint{margin-top:18px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);}
+.login-hint b{color:var(--text);}
+.login-hint .hint-row{margin-bottom:4px;}
+
+/* ── APP ── */
+.app{display:flex;height:100vh;overflow:hidden;}
+
+/* SIDEBAR */
+.sb{width:238px;min-width:238px;background:#172040;color:#c5cfe0;display:flex;flex-direction:column;overflow-y:auto;}
+.sb-brand{padding:16px 14px 12px;border-bottom:1px solid rgba(255,255,255,.08);}
+.sb-icon{font-size:26px;margin-bottom:4px;}
+.sb-title{font-size:13px;font-weight:700;color:#fff;line-height:1.3;}
+.sb-sub{font-size:10px;opacity:.45;margin-top:1px;}
+.sb-sec{padding:12px 12px 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.3);}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;font-size:13px;color:#c5cfe0;border-left:3px solid transparent;transition:all .15s;}
+.ni:hover{background:rgba(255,255,255,.06);color:#fff;}
+.ni.active{background:rgba(29,111,204,.28);border-left-color:var(--blue);color:#fff;}
+.ni-ic{font-size:14px;min-width:18px;text-align:center;}
+.admin-only{display:none;}
+.is-admin .admin-only{display:flex;}
+.sb-user{display:flex;align-items:center;gap:8px;padding:10px 14px 0;}
+.sb-avatar{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:13px;}
+.sb-uname{font-size:12px;color:#fff;font-weight:600;}
+.sb-urole{font-size:10px;color:rgba(255,255,255,.45);}
+.logout-btn{margin:8px 14px 0;padding:6px 10px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:5px;color:rgba(255,255,255,.6);font-size:11px;cursor:pointer;text-align:center;transition:all .15s;}
+.logout-btn:hover{background:rgba(255,255,255,.12);color:#fff;}
+.sb-foot{margin-top:auto;padding:10px 14px;font-size:10px;color:rgba(255,255,255,.25);border-top:1px solid rgba(255,255,255,.07);}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{background:var(--bg);border-bottom:1px solid var(--border);padding:0 18px;height:50px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.tb-title{font-size:15px;font-weight:700;flex:1;}
+.bdg{font-size:11px;font-weight:600;padding:3px 9px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--muted);}
+.bdg.blue{background:var(--blue-l);border-color:#93c5fd;color:var(--blue);}
+.bdg.purple{background:var(--purple-l);border-color:#c4b5fd;color:var(--purple);}
+.bdg.adm{background:var(--admin-l);border-color:#ddd6fe;color:var(--admin);}
+.content{flex:1;overflow-y:auto;padding:18px;}
+
+/* PAGES */
+.page{display:none;} .page.active{display:block;}
+.pg-title{font-size:17px;font-weight:700;margin-bottom:2px;}
+.pg-sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+
+/* STAT */
+.srow{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:11px;margin-bottom:18px;}
+.sc{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:13px 15px;}
+.sc .sl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+.sc .sv{font-size:27px;font-weight:800;margin-top:3px;}
+.sc .ss{font-size:11px;color:var(--muted);margin-top:1px;}
+.sc.cblue .sv{color:var(--blue);} .sc.cgreen .sv{color:var(--green);}
+.sc.cpurple .sv{color:var(--purple);} .sc.cteal .sv{color:var(--teal);}
+.sc.corange .sv{color:var(--orange);} .sc.cred .sv{color:var(--red);}
+
+/* CARD */
+.card{background:var(--bg);border:1px solid var(--border);border-radius:9px;margin-bottom:14px;overflow:hidden;}
+.ch{padding:10px 15px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between;}
+.ct{font-size:13px;font-weight:700;}
+.cb{padding:14px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:860px){.g2{grid-template-columns:1fr;}}
+
+/* TABLE */
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead tr{background:var(--surface2);}
+th{padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;}
+th.c,td.c{text-align:center;}
+td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--surface);}
+.tr-sum td{background:var(--surface2)!important;font-weight:700;border-top:2px solid var(--border);}
+
+/* TAGS */
+.tg{display:inline-block;padding:2px 8px;border-radius:11px;font-size:11px;font-weight:700;}
+.tA{background:var(--green-l);color:var(--green);} .tB{background:var(--blue-l);color:var(--blue);}
+.tC{background:var(--yellow-l);color:var(--yellow);} .tD{background:var(--orange-l);color:var(--orange);}
+.tE{background:var(--red-l);color:var(--red);}
+.tblue{background:var(--blue-l);color:var(--blue);} .tpurple{background:var(--purple-l);color:var(--purple);}
+.tgreen{background:var(--green-l);color:var(--green);} .tred{background:var(--red-l);color:var(--red);}
+
+/* FILTER */
+.fb{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:9px;margin-bottom:14px;}
+.fg{display:flex;flex-direction:column;gap:3px;}
+.fg label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+.fg select,.fg input{border:1px solid var(--border);border-radius:5px;padding:6px 8px;font-size:13px;color:var(--text);background:var(--surface);min-width:148px;outline:none;}
+.fg select:focus,.fg input:focus{border-color:var(--blue);}
+
+/* BUTTONS */
+.btn{padding:7px 13px;border-radius:5px;border:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s;line-height:1;}
+.btn:hover{opacity:.82;}
+.btn-p{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn-g{background:var(--surface);color:var(--text);}
+.btn-danger{background:var(--red-l);color:var(--red);border-color:#fca5a5;}
+.btn-warn{background:var(--yellow-l);color:var(--yellow);border-color:#fcd34d;}
+.btn-admin{background:var(--admin);color:#fff;border-color:var(--admin);}
+.btn-sm{padding:4px 9px;font-size:11px;}
+
+/* CHIPS */
+.cr{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;}
+.chip{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:11px;color:var(--muted);}
+.chip strong{color:var(--text);}
+
+/* MODERASI */
+.mc{background:var(--bg);border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-bottom:11px;}
+.mh{padding:9px 13px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);}
+.mh.blue{background:var(--blue-l);} .mh.purple{background:var(--purple-l);}
+.mh-t{font-size:13px;font-weight:700;} .mh-w{font-size:11px;color:var(--muted);}
+.mT td{background:#f0fdf4;} .mS td{background:#fefce8;} .mR td{background:#fff1f2;}
+.ml{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 7px;border-radius:9px;}
+.mlT{background:var(--green-l);color:var(--green);} .mlS{background:var(--yellow-l);color:var(--yellow);} .mlR{background:var(--red-l);color:var(--red);}
+.msign{padding:9px 13px;border-top:1px solid var(--border);display:flex;gap:14px;flex-wrap:wrap;}
+.msf{display:flex;flex-direction:column;gap:2px;flex:1;min-width:120px;}
+.msf label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);}
+.msf input{border:none;border-bottom:1px dashed var(--border);padding:3px 0;font-size:12px;outline:none;background:transparent;color:var(--text);width:100%;}
+
+/* BAR CHART */
+.bg{display:flex;flex-direction:column;gap:8px;}
+.br{display:flex;align-items:center;gap:8px;}
+.bl{font-size:12px;color:var(--muted);font-weight:600;min-width:56px;}
+.bt{flex:1;background:var(--surface2);border-radius:4px;height:19px;overflow:hidden;}
+.bf{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:6px;font-size:11px;font-weight:700;color:#fff;transition:width .35s ease;}
+.bc{font-size:12px;font-weight:700;min-width:26px;text-align:right;}
+
+/* NOTICE */
+.notice{border-radius:7px;padding:8px 12px;margin-bottom:14px;font-size:12px;display:flex;align-items:center;gap:8px;}
+.notice-admin{background:var(--admin-l);border:1px solid #ddd6fe;color:var(--admin);display:none;}
+.is-admin .notice-admin{display:flex;}
+.notice-ro{background:var(--blue-l);border:1px solid #93c5fd;color:var(--blue);}
+
+/* MODAL */
+.modal-bd{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:5000;display:none;align-items:center;justify-content:center;}
+.modal-bd.open{display:flex;}
+.modal{background:#fff;border-radius:12px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal-hd{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-ttl{font-size:15px;font-weight:700;}
+.modal-x{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);line-height:1;}
+.modal-x:hover{color:var(--red);}
+.modal-body{padding:20px;}
+.modal-ft{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+.fr{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.fr label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+.fr input,.fr select{border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text);outline:none;width:100%;}
+.fr input:focus,.fr select:focus{border-color:var(--blue);}
+.ferr{font-size:12px;color:var(--red);margin-top:4px;}
+
+/* TUGASAN */
+.tug-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;}
+.tug-card{border:1px solid var(--border);border-radius:8px;padding:14px;}
+.tug-kelas{font-size:15px;font-weight:700;margin-bottom:8px;}
+
+/* SQL */
+.sqla{font-family:"Cascadia Code","Fira Code",Consolas,monospace;font-size:12px;width:100%;min-height:90px;border:1px solid var(--border);border-radius:6px;padding:10px;resize:vertical;background:#1e1e2e;color:#cdd6f4;outline:none;}
+.sqlr{overflow-x:auto;max-height:340px;overflow-y:auto;margin-top:10px;}
+.sqlr table{font-size:12px;}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:9900;display:none;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,.3);color:#fff;}
+
+@media print{
+  .sb,.topbar,.fb,.btn,#page-db,.modal-bd,#toast{display:none!important;}
+  .page{display:block!important;}
+  .content{overflow:visible;}
+  .app{display:block;height:auto;}
+  .main{overflow:visible;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="ls">
+  <div class="spin"></div>
+  <p>Memuat Database SAINS...</p>
+  <small>sql.js · SQLite in Browser</small>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen" style="display:none;">
+  <div class="login-box">
+    <div class="login-icon">🔬</div>
+    <div class="login-title">Dashboard SAINS</div>
+    <div class="login-sub">Kolej Komuniti Kuala Terengganu · v3.0</div>
+    <div class="lf"><label>Nama Pengguna</label><input type="text" id="li-user" placeholder="Nama pengguna" autocomplete="username"></div>
+    <div class="lf"><label>Kata Laluan</label><input type="password" id="li-pass" placeholder="Kata laluan" autocomplete="current-password"></div>
+    <button class="login-btn" onclick="doLogin()">Log Masuk →</button>
+    <div class="login-err" id="li-err"></div>
+    <div class="login-hint">
+      <div class="hint-row">👑 <b>Admin:</b> admin / sains2025</div>
+      <div class="hint-row">👨‍🏫 <b>Pensyarah 1:</b> pensyarah1 / sains2025</div>
+      <div class="hint-row">👩‍🏫 <b>Pensyarah 2:</b> pensyarah2 / sains2025</div>
+      <div class="hint-row">👩‍🏫 <b>Pensyarah 3:</b> pensyarah3 / sains2025</div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app" style="display:none;">
+  <!-- SIDEBAR -->
+  <div class="sb" id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-icon">🔬</div>
+      <div class="sb-title">Dashboard SAINS</div>
+      <div class="sb-sub">KKKT &amp; KKKTcS · v3.0</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sb-av">👤</div>
+      <div><div class="sb-uname" id="sb-name">-</div><div class="sb-urole" id="sb-role">-</div></div>
+    </div>
+    <div class="logout-btn" onclick="doLogout()">⏻ Log Keluar</div>
+
+    <div class="sb-sec">Utama</div>
+    <div class="ni active" onclick="showPage('ringkasan',this)"><span class="ni-ic">📋</span> Ringkasan</div>
+    <div class="ni" onclick="showPage('markah',this)"><span class="ni-ic">📊</span> Markah Pelajar</div>
+    <div class="ni" onclick="showPage('moderasi',this)"><span class="ni-ic">🔍</span> Moderasi Markah</div>
+    <div class="ni" onclick="showPage('laporan',this)"><span class="ni-ic">📈</span> Laporan &amp; Graf</div>
+
+    <div class="sb-sec">Data</div>
+    <div class="ni" onclick="showPage('kelas',this)"><span class="ni-ic">🏫</span> Senarai Kelas</div>
+    <div class="ni" onclick="showPage('pensyarah',this)"><span class="ni-ic">👨‍🏫</span> Pensyarah</div>
+    <div class="ni" onclick="showPage('kursus',this)"><span class="ni-ic">📚</span> Kursus &amp; Penilaian</div>
+    <div class="ni" onclick="showPage('pelajar',this)"><span class="ni-ic">👥</span> Pelajar</div>
+    <div class="ni admin-only" onclick="showPage('tugasan',this)"><span class="ni-ic">🔗</span> Tugasan Pensyarah</div>
+
+    <div class="sb-sec">Sistem</div>
+    <div class="ni" onclick="showPage('db',this)"><span class="ni-ic">🗃️</span> SQL Explorer</div>
+    <div class="sb-foot">IBM Bob · Admin Edition<br>SQLite via sql.js (WebAssembly)</div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="tb-title" id="tb-title">Ringkasan</div>
+      <span class="bdg blue">SBS10012</span>
+      <span class="bdg purple">SBS10022</span>
+      <span class="bdg" id="bdg-kelas">4 Kelas</span>
+      <span class="bdg" id="bdg-pelajar">60 Pelajar</span>
+      <span class="bdg adm" id="bdg-role" style="display:none;">👑 Admin</span>
+      <button class="btn btn-g" style="font-size:12px;margin-left:4px;" onclick="window.print()">🖨️ Cetak</button>
+    </div>
+    <div class="content">
+
+      <!-- RINGKASAN -->
+      <div class="page active" id="page-ringkasan">
+        <div class="pg-title">Ringkasan Keseluruhan</div>
+        <div class="pg-sub">Semua kelas, pensyarah dan kolej — Sesi 2024/2025</div>
+        <div class="srow" id="r-stats"></div>
+        <div class="g2">
+          <div class="card"><div class="ch"><span class="ct">📋 Maklumat Kelas</span></div><div class="cb tw" id="r-kelas"></div></div>
+          <div class="card"><div class="ch"><span class="ct">📚 Skema Penilaian</span></div><div class="cb" id="r-skema"></div></div>
+        </div>
+        <div class="card"><div class="ch"><span class="ct">🎓 Skema Gred</span></div><div class="cb tw">
+          <table><thead><tr><th>Gred</th><th>Markah (%)</th><th>Taraf</th></tr></thead><tbody>
+            <tr><td><span class="tg tA">A</span></td><td>80–100</td><td>Cemerlang</td></tr>
+            <tr><td><span class="tg tB">B</span></td><td>65–79</td><td>Kepujian</td></tr>
+            <tr><td><span class="tg tC">C</span></td><td>50–64</td><td>Lulus</td></tr>
+            <tr><td><span class="tg tD">D</span></td><td>40–49</td><td>Lulus Bersyarat</td></tr>
+            <tr><td><span class="tg tE">E</span></td><td>0–39</td><td>Gagal</td></tr>
+          </tbody></table>
+        </div></div>
+      </div>
+
+      <!-- MARKAH -->
+      <div class="page" id="page-markah">
+        <div class="pg-title">Markah Pelajar</div>
+        <div class="pg-sub">Markah setiap pelajar mengikut komponen penilaian</div>
+        <div class="fb">
+          <div class="fg"><label>Kolej</label><select id="fk"><option value="">Semua Kolej</option></select></div>
+          <div class="fg"><label>Pensyarah</label><select id="fp"><option value="">Semua Pensyarah</option></select></div>
+          <div class="fg"><label>Kelas</label><select id="fkl"><option value="">Semua Kelas</option></select></div>
+          <div class="fg"><label>&nbsp;</label><button class="btn btn-g" onclick="resetMF()">↺ Reset</button></div>
+        </div>
+        <div id="mc"></div>
+      </div>
+
+      <!-- MODERASI -->
+      <div class="page" id="page-moderasi">
+        <div class="pg-title">Moderasi Markah</div>
+        <div class="pg-sub">3 wakil pelajar (Tinggi / Sederhana / Rendah) per komponen</div>
+        <div class="fb">
+          <div class="fg"><label>Kelas</label><select id="mfk"><option value="">Semua Kelas</option></select></div>
+          <div class="fg"><label>Komponen</label><select id="mfc"><option value="">Semua Komponen</option></select></div>
+          <div class="fg"><label>&nbsp;</label><button class="btn btn-g" onclick="resetMod()">↺ Reset</button></div>
+          <div class="fg" style="margin-left:auto"><label>&nbsp;</label><button class="btn btn-p" onclick="window.print()">🖨️ Cetak</button></div>
+        </div>
+        <div id="modc"></div>
+      </div>
+
+      <!-- LAPORAN -->
+      <div class="page" id="page-laporan">
+        <div class="pg-title">Laporan &amp; Graf Prestasi</div>
+        <div class="pg-sub">Analisis taburan gred dan prestasi per kelas / pensyarah</div>
+        <div id="lc"></div>
+      </div>
+
+      <!-- KELAS -->
+      <div class="page" id="page-kelas">
+        <div class="pg-title">Senarai Kelas</div>
+        <div class="pg-sub">Data jadual <code>kelas</code> dalam SQLite</div>
+        <div class="notice notice-admin">👑 Mod Admin: Tambah, ubah atau padam kelas.</div>
+        <div class="notice notice-ro" id="kelas-ro" style="display:none;">👁️ Mod Lihat Sahaja — Hanya admin boleh mengubah data.</div>
+        <div class="card">
+          <div class="ch"><span class="ct">Kelas</span>
+            <button class="btn btn-admin btn-sm admin-only" onclick="openModal('kelas','add')">＋ Tambah Kelas</button>
+          </div>
+          <div class="cb tw" id="kelas-t"></div>
+        </div>
+      </div>
+
+      <!-- PENSYARAH -->
+      <div class="page" id="page-pensyarah">
+        <div class="pg-title">Senarai Pensyarah</div>
+        <div class="pg-sub">Data jadual <code>pensyarah</code></div>
+        <div class="notice notice-admin">👑 Mod Admin: Tambah, ubah atau padam pensyarah.</div>
+        <div class="notice notice-ro" id="ps-ro" style="display:none;">👁️ Mod Lihat Sahaja — Hanya admin boleh mengubah data.</div>
+        <div class="card">
+          <div class="ch"><span class="ct">Pensyarah</span>
+            <button class="btn btn-admin btn-sm admin-only" onclick="openModal('pensyarah','add')">＋ Tambah Pensyarah</button>
+          </div>
+          <div class="cb tw" id="ps-t"></div>
+        </div>
+      </div>
+
+      <!-- KURSUS -->
+      <div class="page" id="page-kursus">
+        <div class="pg-title">Kursus &amp; Komponen Penilaian</div>
+        <div class="pg-sub">Data jadual <code>kursus</code> &amp; <code>komponen</code></div>
+        <div class="notice notice-admin">👑 Mod Admin: Tambah kursus dan urus komponen penilaian.</div>
+        <div class="notice notice-ro" id="ks-ro" style="display:none;">👁️ Mod Lihat Sahaja — Hanya admin boleh mengubah data.</div>
+        <div class="g2">
+          <div class="card">
+            <div class="ch"><span class="ct">Kursus</span>
+              <button class="btn btn-admin btn-sm admin-only" onclick="openModal('kursus','add')">＋ Tambah</button>
+            </div>
+            <div class="cb tw" id="ks-t"></div>
+          </div>
+          <div class="card">
+            <div class="ch"><span class="ct">Komponen Penilaian</span>
+              <button class="btn btn-admin btn-sm admin-only" onclick="openModal('komponen','add')">＋ Tambah</button>
+            </div>
+            <div class="cb tw" id="ko-t"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PELAJAR -->
+      <div class="page" id="page-pelajar">
+        <div class="pg-title">Senarai Pelajar</div>
+        <div class="pg-sub">Data jadual <code>pelajar</code> — 60 dummy pelajar</div>
+        <div class="notice notice-admin">👑 Mod Admin: Tambah, ubah (nama &amp; no. pendaftaran) atau padam pelajar.</div>
+        <div class="notice notice-ro" id="pl-ro" style="display:none;">👁️ Mod Lihat Sahaja — Hanya admin boleh mengubah data.</div>
+        <div class="fb">
+          <div class="fg"><label>Kelas</label><select id="pfk"><option value="">Semua Kelas</option></select></div>
+          <div class="fg" style="margin-left:auto"><label>&nbsp;</label>
+            <button class="btn btn-admin btn-sm admin-only" onclick="openModal('pelajar','add')">＋ Tambah Pelajar</button>
+          </div>
+        </div>
+        <div class="card"><div class="cb tw" id="pl-t"></div></div>
+      </div>
+
+      <!-- TUGASAN PENSYARAH -->
+      <div class="page" id="page-tugasan">
+        <div class="pg-title">Tugasan Pensyarah kepada Kelas</div>
+        <div class="pg-sub">Tetapkan pensyarah yang mengajar bagi setiap kelas</div>
+        <div class="notice notice-admin">👑 Mod Admin: Pilih pensyarah untuk setiap kelas dan klik Simpan.</div>
+        <div class="card">
+          <div class="ch"><span class="ct">🔗 Tetapkan Pensyarah ke Kelas</span></div>
+          <div class="cb" id="tugasan-c"></div>
+        </div>
+        <div class="card">
+          <div class="ch"><span class="ct">📋 Tugasan Semasa</span></div>
+          <div class="cb tw" id="tugasan-s"></div>
+        </div>
+      </div>
+
+      <!-- SQL EXPLORER -->
+      <div class="page" id="page-db">
+        <div class="pg-title">SQL Explorer</div>
+        <div class="pg-sub">Laksanakan query SQL terus terhadap SQLite database</div>
+        <div class="card"><div class="ch"><span class="ct">Skema Database</span></div><div class="cb" id="db-schema"></div></div>
+        <div class="card">
+          <div class="ch"><span class="ct">Query SQL</span></div>
+          <div class="cb">
+            <textarea class="sqla" id="sql-in" placeholder="Taip SQL di sini...">SELECT k.kod_kelas, k.kursus_kod, p.nama AS pensyarah, kj.nama AS kolej
+FROM kelas k JOIN pensyarah p ON k.pensyarah_id=p.id JOIN kolej kj ON k.kolej=kj.kod
+ORDER BY k.kolej, k.kod_kelas;</textarea>
+            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-p" onclick="runSQL()">▶ Jalankan</button>
+              <button class="btn btn-g" onclick="sqlP('pelajar')">Pelajar</button>
+              <button class="btn btn-g" onclick="sqlP('markah')">Markah</button>
+              <button class="btn btn-g" onclick="sqlP('moderasi')">Moderasi</button>
+              <button class="btn btn-g" onclick="sqlP('stats')">Statistik</button>
+            </div>
+            <div class="sqlr" id="sql-out"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bd" id="modal-bd" onclick="closeModalOut(event)">
+  <div class="modal" id="modal-box">
+    <div class="modal-hd">
+      <div class="modal-ttl" id="modal-ttl">-</div>
+      <button class="modal-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-ft" id="modal-ft"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// USERS
+// ══════════════════════════════════════════
+const USERS=[
+  {user:"admin",      pass:"sains2025",role:"admin",    nama:"Admin Sistem",                    av:"👑"},
+  {user:"pensyarah1", pass:"sains2025",role:"pensyarah",nama:"Wan Noorhishamudin bin Wan Mohd", av:"👨‍🏫",psid:1},
+  {user:"pensyarah2", pass:"sains2025",role:"pensyarah",nama:"Junaidah binti Mohamad",          av:"👩‍🏫",psid:2},
+  {user:"pensyarah3", pass:"sains2025",role:"pensyarah",nama:"Suraya binti Mustaffa",           av:"👩‍🏫",psid:3},
+];
+let CU=null; // current user
+
+// ══════════════════════════════════════════
+// SEED DATA
+// ══════════════════════════════════════════
+const SK=[{kod:"KKKT",nama:"Kolej Komuniti Kuala Terengganu"},{kod:"KKKTcS",nama:"Kolej Komuniti Kuala Terengganu Cawangan Setiu"}];
+const SP=[{id:1,nama:"Wan Noorhishamudin bin Wan Mohd",kolej:"KKKT"},{id:2,nama:"Junaidah binti Mohamad",kolej:"KKKT"},{id:3,nama:"Suraya binti Mustaffa",kolej:"KKKTcS"}];
+const SKU=[{kod:"SBS10012",nama:"SAINS",versi:"Kod Lama"},{kod:"SBS10022",nama:"SAINS",versi:"Kod Baharu"}];
+const SKO=[
+  {id:1,k:"SBS10012",u:1,n:"Ujian 1",w:20},{id:2,k:"SBS10012",u:2,n:"Ujian 2",w:30},{id:3,k:"SBS10012",u:3,n:"Kuiz 1",w:20},
+  {id:4,k:"SBS10012",u:4,n:"Kuiz 2",w:10},{id:5,k:"SBS10012",u:5,n:"Amali 1",w:10},{id:6,k:"SBS10012",u:6,n:"Amali 2",w:10},
+  {id:7,k:"SBS10022",u:1,n:"Ujian 1",w:30},{id:8,k:"SBS10022",u:2,n:"Kuiz 1",w:20},{id:9,k:"SBS10022",u:3,n:"Kuiz 2",w:10},
+  {id:10,k:"SBS10022",u:4,n:"Amali 1",w:20},{id:11,k:"SBS10022",u:5,n:"Amali 2",w:20},
+];
+const SKL=[
+  {id:1,kod:"SKE1A",prog:"Sijil Teknologi Elektrik",          kp:"SKE",kj:"KKKT",   ps:1,ku:"SBS10012"},
+  {id:2,kod:"SKE1B",prog:"Sijil Teknologi Elektrik",          kp:"SKE",kj:"KKKT",   ps:2,ku:"SBS10012"},
+  {id:3,kod:"STP2A",prog:"Sijil Teknologi Pembinaan Bangunan",kp:"STP",kj:"KKKTcS", ps:3,ku:"SBS10022"},
+  {id:4,kod:"STP2B",prog:"Sijil Teknologi Pembinaan Bangunan",kp:"STP",kj:"KKKTcS", ps:2,ku:"SBS10022"},
+];
+const NM=[
+  "Ahmad Syafiq bin Roslan","Nurul Ain binti Zainal","Muhammad Haziq bin Azmi","Siti Nur Aisyah binti Hamid",
+  "Mohamad Faiz bin Ismail","Nurul Hidayah binti Hassan","Hafiz Azri bin Mohd Noor","Fatin Nadirah binti Kamal",
+  "Amirul Hakim bin Sulaiman","Nur Syazwani binti Yusof","Zulhilmi bin Abd Razak","Nazira binti Othman",
+  "Izzatul Husna binti Mohd Sharif","Khairul Anwar bin Jaafar","Siti Rahayu binti Daud","Azlan Shah bin Mohd Zain",
+  "Nur Filzah binti Saad","Mohd Arif bin Hamdan","Hasniza binti Abdul Ghani","Ridhwan Amri bin Kassim",
+  "Nor Azimah binti Tahir","Aiman Haikal bin Ramli","Siti Zulaikha binti Nordin","Mohd Firdaus bin Zulkifli",
+  "Nurfarahin binti Ismail","Zainal Abidin bin Wahab","Maryam binti Kamarul Zaman","Hazwan Faizal bin Bahari",
+  "Nor Hasliza binti Mansor","Adam Irfan bin Hashim","Liyana Syahira binti Aziz","Amirul Asyraf bin Kamarudin",
+  "Farah Syuhada binti Zainol","Irfan Hadzri bin Osman","Nurul Farhana binti Md Yusof","Syafiqah binti Abdul Halim",
+  "Harith Hakimi bin Ghazali","Norsyafiqah binti Salleh","Nazirul Amin bin Idris","Umi Kalsum binti Rashid",
+  "Danish Haziq bin Lokman","Hafeeza binti Hamzah","Emir Zakwan bin Ariffin","Nur Sabrina binti Mohd Salleh",
+  "Adib Hazwan bin Hashim","Nurul Nadhirah binti Kadir","Zharif Aiman bin Zainudin","Hazwani binti Hussain",
+  "Fitri Wazzan bin Saifuddin","Aliya Natasya binti Ramlan","Amira Damia binti Rosli","Hakim Nasrullah bin Suhaimi",
+  "Nur Aqilah binti Azman","Shahril Izuan bin Johari","Syuhada Najiha binti Basri","Luqman Hakim bin Razali",
+  "Wan Izzah binti Wan Ismail","Afiq Danial bin Mohd Zaini","Nadhirah binti Sabri","Noor Hamizah binti Khairu"
+];
+
+function sr(seed){let s=seed%2147483647;if(s<=0)s+=2147483646;return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646;};}
+
+let DB=null;
+
+// ══════════════════════════════════════════
+// BUILD DB
+// ══════════════════════════════════════════
+async function buildDB(SQL){
+  const db=new SQL.Database();
+  db.run(`
+    CREATE TABLE kolej(kod TEXT PRIMARY KEY,nama TEXT NOT NULL);
+    CREATE TABLE pensyarah(id INTEGER PRIMARY KEY,nama TEXT NOT NULL,kolej TEXT NOT NULL,FOREIGN KEY(kolej) REFERENCES kolej(kod));
+    CREATE TABLE kursus(kod TEXT PRIMARY KEY,nama TEXT NOT NULL,versi TEXT NOT NULL);
+    CREATE TABLE komponen(id INTEGER PRIMARY KEY,kursus_kod TEXT NOT NULL,urutan INTEGER NOT NULL,nama TEXT NOT NULL,wajaran INTEGER NOT NULL,FOREIGN KEY(kursus_kod) REFERENCES kursus(kod));
+    CREATE TABLE kelas(id INTEGER PRIMARY KEY,kod_kelas TEXT UNIQUE NOT NULL,program TEXT NOT NULL,kod_program TEXT NOT NULL,kolej TEXT NOT NULL,pensyarah_id INTEGER NOT NULL,kursus_kod TEXT NOT NULL,FOREIGN KEY(pensyarah_id) REFERENCES pensyarah(id),FOREIGN KEY(kursus_kod) REFERENCES kursus(kod),FOREIGN KEY(kolej) REFERENCES kolej(kod));
+    CREATE TABLE pelajar(id INTEGER PRIMARY KEY,no_pendaftaran TEXT UNIQUE NOT NULL,nama TEXT NOT NULL,kelas_id INTEGER NOT NULL,FOREIGN KEY(kelas_id) REFERENCES kelas(id));
+    CREATE TABLE markah(id INTEGER PRIMARY KEY,pelajar_id INTEGER NOT NULL,komponen_id INTEGER NOT NULL,nilai REAL NOT NULL,UNIQUE(pelajar_id,komponen_id),FOREIGN KEY(pelajar_id) REFERENCES pelajar(id),FOREIGN KEY(komponen_id) REFERENCES komponen(id));
+  `);
+  SK.forEach(r=>db.run("INSERT INTO kolej VALUES(?,?)",[r.kod,r.nama]));
+  SP.forEach(r=>db.run("INSERT INTO pensyarah VALUES(?,?,?)",[r.id,r.nama,r.kolej]));
+  SKU.forEach(r=>db.run("INSERT INTO kursus VALUES(?,?,?)",[r.kod,r.nama,r.versi]));
+  SKO.forEach(r=>db.run("INSERT INTO komponen VALUES(?,?,?,?,?)",[r.id,r.k,r.u,r.n,r.w]));
+  SKL.forEach(r=>db.run("INSERT INTO kelas VALUES(?,?,?,?,?,?,?)",[r.id,r.kod,r.prog,r.kp,r.kj,r.ps,r.ku]));
+  let pid=1,mid=1;
+  SKL.forEach((kl,ki)=>{
+    const komps=SKO.filter(c=>c.k===kl.ku);
+    const rand=sr(ki*997+13);
+    for(let i=1;i<=15;i++){
+      const ni=(ki*15+i-1)%NM.length;
+      db.run("INSERT INTO pelajar VALUES(?,?,?,?)",[pid,`${kl.kod}/${String(i).padStart(3,"0")}/2025`,NM[ni],kl.id]);
+      komps.forEach(k=>{
+        const d=rand();
+        let v;
+        if(d<.08) v=20+Math.round(rand()*25);
+        else if(d<.22) v=45+Math.round(rand()*15);
+        else if(d<.55) v=55+Math.round(rand()*20);
+        else if(d<.85) v=70+Math.round(rand()*18);
+        else v=83+Math.round(rand()*15);
+        db.run("INSERT INTO markah VALUES(?,?,?,?)",[mid++,pid,k.id,Math.min(100,Math.max(10,v))]);
+      });
+      pid++;
+    }
+  });
+  return db;
+}
+
+// ══════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════
+function qry(sql,p=[]){const r=DB.exec(sql,p);if(!r.length)return[];const{columns:c,values:v}=r[0];return v.map(row=>{const o={};c.forEach((col,i)=>o[col]=row[i]);return o;});}
+function q1(sql,p=[]){const r=qry(sql,p);return r.length?r[0]:null;}
+function nid(t){return(q1(`SELECT MAX(id) AS m FROM ${t}`)?.m||0)+1;}
+function grd(m){if(m>=80)return"A";if(m>=65)return"B";if(m>=50)return"C";if(m>=40)return"D";return"E";}
+function jw(mm,ks){let t=0;ks.forEach(k=>{t+=(mm[k.id]??0)/100*k.wajaran;});return Math.round(t*10)/10;}
+function mkT(rows,cols){
+  if(!rows.length)return"<p style='color:var(--muted);padding:8px'>Tiada rekod.</p>";
+  const cs=cols||Object.keys(rows[0]);
+  return`<table><thead><tr>${cs.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${cs.map(c=>`<td>${r[c]??""}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+function toast(msg,type="ok"){
+  const t=document.getElementById("toast");
+  t.textContent=(type==="ok"?"✅ ":type==="warn"?"⚠️ ":"❌ ")+msg;
+  t.style.cssText=`position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:9900;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,.3);color:#fff;background:${type==="ok"?"#15803d":type==="warn"?"#b45309":"#be123c"}`;
+  clearTimeout(t._to);t._to=setTimeout(()=>t.style.display="none",2800);
+}
+
+// ══════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════
+function isAdmin(){return CU?.role==="admin";}
+function doLogin(){
+  const u=document.getElementById("li-user").value.trim();
+  const p=document.getElementById("li-pass").value;
+  const f=USERS.find(x=>x.user===u&&x.pass===p);
+  if(!f){document.getElementById("li-err").textContent="Nama pengguna atau kata laluan salah.";return;}
+  CU=f;
+  document.getElementById("li-err").textContent="";
+  document.getElementById("login-screen").style.display="none";
+  applyRole();
+  document.getElementById("app").style.display="flex";
+  renderRingkasan();
+}
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&document.getElementById("login-screen").style.display!=="none")doLogin();});
+function doLogout(){
+  CU=null;
+  document.getElementById("app").style.display="none";
+  document.getElementById("login-screen").style.display="flex";
+  document.getElementById("li-user").value="";
+  document.getElementById("li-pass").value="";
+  mfI=false;modI=false;pfI=false;
+  ["fk","fp","fkl","mfk","mfc","pfk"].forEach(id=>{const el=document.getElementById(id);if(el)while(el.options.length>1)el.remove(1);});
+}
+function applyRole(){
+  const a=isAdmin();
+  document.getElementById("sidebar").classList.toggle("is-admin",a);
+  document.getElementById("bdg-role").style.display=a?"inline-flex":"none";
+  document.getElementById("sb-name").textContent=CU.nama;
+  document.getElementById("sb-role").textContent=a?"👑 Admin":"👨‍🏫 Pensyarah";
+  document.getElementById("sb-av").textContent=CU.av;
+}
+
+// ══════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════
+const PT={ringkasan:"Ringkasan",markah:"Markah Pelajar",moderasi:"Moderasi Markah",laporan:"Laporan & Graf",
+  kelas:"Senarai Kelas",pensyarah:"Pensyarah",kursus:"Kursus & Penilaian",pelajar:"Pelajar",
+  tugasan:"Tugasan Pensyarah",db:"SQL Explorer"};
+function showPage(n,el){
+  if(n==="tugasan"&&!isAdmin()){toast("Akses ditolak. Hanya admin.","err");return;}
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".ni").forEach(x=>x.classList.remove("active"));
+  document.getElementById("page-"+n).classList.add("active");
+  if(el)el.classList.add("active");
+  document.getElementById("tb-title").textContent=PT[n]||n;
+  // RO notices
+  ["kelas-ro","ps-ro","ks-ro","pl-ro"].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=isAdmin()?"none":"flex";});
+  const M={ringkasan:renderRingkasan,markah:()=>{initMF();renderMarkah();},moderasi:()=>{initMod();renderMod();},
+    laporan:renderLaporan,kelas:renderKelasPage,pensyarah:renderPensyarahPage,kursus:renderKursusPage,
+    pelajar:()=>{initPF();renderPelajar();},tugasan:renderTugasan,db:renderDBSchema};
+  if(M[n])M[n]();
+}
+
+// ══════════════════════════════════════════
+// RINGKASAN
+// ══════════════════════════════════════════
+function renderRingkasan(){
+  const nK=q1("SELECT COUNT(*) AS n FROM kelas").n,nP=q1("SELECT COUNT(*) AS n FROM pelajar").n,nPs=q1("SELECT COUNT(*) AS n FROM pensyarah").n;
+  const ts=qry("SELECT p.id,SUM(m.nilai*k.wajaran/100.0) AS t FROM pelajar p JOIN markah m ON m.pelajar_id=p.id JOIN komponen k ON k.id=m.komponen_id GROUP BY p.id");
+  const nL=ts.filter(r=>r.t>=50).length,avgA=(ts.reduce((s,r)=>s+r.t,0)/ts.length).toFixed(1);
+  document.getElementById("r-stats").innerHTML=`
+    <div class="sc cblue"><div class="sl">Kelas</div><div class="sv">${nK}</div><div class="ss">SKE1A·SKE1B·STP2A·STP2B</div></div>
+    <div class="sc"><div class="sl">Pelajar</div><div class="sv">${nP}</div><div class="ss">15 pelajar / kelas</div></div>
+    <div class="sc cpurple"><div class="sl">Pensyarah</div><div class="sv">${nPs}</div><div class="ss">2 KKKT · 1 KKKTcS</div></div>
+    <div class="sc cgreen"><div class="sl">Lulus</div><div class="sv">${nL}</div><div class="ss">markah ≥ 50%</div></div>
+    <div class="sc cred"><div class="sl">Gagal</div><div class="sv">${nP-nL}</div><div class="ss">markah < 50%</div></div>
+    <div class="sc cteal"><div class="sl">Purata</div><div class="sv">${avgA}%</div><div class="ss">keseluruhan</div></div>`;
+  document.getElementById("r-kelas").innerHTML=mkT(qry("SELECT k.kod_kelas AS Kelas,k.kod_program AS Program,kj.nama AS Kolej,p.nama AS Pensyarah,k.kursus_kod AS [Kod Kursus] FROM kelas k JOIN pensyarah p ON k.pensyarah_id=p.id JOIN kolej kj ON k.kolej=kj.kod ORDER BY k.kolej,k.kod_kelas"));
+  let sk="";
+  SKU.forEach(ks=>{
+    const ko=qry("SELECT nama,wajaran FROM komponen WHERE kursus_kod=? ORDER BY urutan",[ks.kod]);
+    const iN=ks.kod==="SBS10022";
+    sk+=`<div style="margin-bottom:12px"><div style="font-weight:700;font-size:12px;margin-bottom:5px"><span class="tg ${iN?"tpurple":"tblue"}">${ks.kod}</span> ${ks.nama} — ${ks.versi}</div>
+    <table><thead><tr><th>#</th><th>Komponen</th><th class="c">Wajaran</th></tr></thead><tbody>
+    ${ko.map((c,i)=>`<tr><td>${i+1}</td><td>${c.nama}</td><td class="c">${c.wajaran}%</td></tr>`).join("")}
+    <tr class="tr-sum"><td colspan="2" style="text-align:right">Jumlah</td><td class="c">100%</td></tr></tbody></table></div>`;
+  });
+  document.getElementById("r-skema").innerHTML=sk;
+}
+
+// ══════════════════════════════════════════
+// MARKAH
+// ══════════════════════════════════════════
+let mfI=false;
+function initMF(){
+  if(mfI)return;mfI=true;
+  qry("SELECT DISTINCT kolej FROM kelas ORDER BY kolej").forEach(r=>{const o=new Option(r.kolej,r.kolej);document.getElementById("fk").add(o);});
+  qry("SELECT id,nama FROM pensyarah ORDER BY nama").forEach(r=>{const o=new Option(r.nama,r.id);document.getElementById("fp").add(o);});
+  qry("SELECT id,kod_kelas FROM kelas ORDER BY kod_kelas").forEach(r=>{const o=new Option(r.kod_kelas,r.id);document.getElementById("fkl").add(o);});
+  ["fk","fp","fkl"].forEach(id=>document.getElementById(id).addEventListener("change",renderMarkah));
+}
+function resetMF(){["fk","fp","fkl"].forEach(id=>document.getElementById(id).value="");renderMarkah();}
+function renderMarkah(){
+  const kj=document.getElementById("fk").value,ps=document.getElementById("fp").value,kl=document.getElementById("fkl").value;
+  let w="WHERE 1=1";const p=[];
+  if(kj){w+=" AND k.kolej=?";p.push(kj);}if(ps){w+=" AND k.pensyarah_id=?";p.push(ps);}if(kl){w+=" AND k.id=?";p.push(kl);}
+  const kls=qry(`SELECT k.*,ps.nama AS pensyarah,kj.nama AS kolej_nama FROM kelas k JOIN pensyarah ps ON k.pensyarah_id=ps.id JOIN kolej kj ON k.kolej=kj.kod ${w} ORDER BY k.kolej,k.kod_kelas`,p);
+  let html="";
+  kls.forEach(kl=>{
+    const ko=qry("SELECT * FROM komponen WHERE kursus_kod=? ORDER BY urutan",[kl.kursus_kod]);
+    const pl=qry("SELECT * FROM pelajar WHERE kelas_id=? ORDER BY no_pendaftaran",[kl.id]);
+    const iN=kl.kursus_kod==="SBS10022";
+    const rows=pl.map(p=>{const mm={};qry("SELECT komponen_id,nilai FROM markah WHERE pelajar_id=?",[p.id]).forEach(m=>mm[m.komponen_id]=m.nilai);const j=jw(mm,ko);return{...p,mm,j,g:grd(j)};});
+    const avg=(rows.reduce((s,r)=>s+r.j,0)/rows.length).toFixed(1),lulus=rows.filter(r=>r.j>=50).length;
+    const kH=ko.map(k=>`<th class="c">${k.nama}<br><span style="font-weight:400;font-size:10px">(${k.wajaran}%)</span></th>`).join("");
+    const kA=ko.map(k=>{const a=(rows.reduce((s,r)=>s+(r.mm[k.id]||0),0)/rows.length).toFixed(1);return`<td class="c" style="font-size:11px;color:var(--muted)">${a}</td>`;}).join("");
+    html+=`<div class="cr">
+      <div class="chip"><strong>Kelas:</strong> ${kl.kod_kelas}</div>
+      <div class="chip"><strong>Program:</strong> ${kl.program} (${kl.kod_program})</div>
+      <div class="chip"><strong>Kolej:</strong> ${kl.kolej_nama}</div>
+      <div class="chip"><strong>Pensyarah:</strong> ${kl.pensyarah}</div>
+      <div class="chip"><strong>Kursus:</strong> <span class="tg ${iN?"tpurple":"tblue"}">${kl.kursus_kod}</span></div>
+      <div class="chip" style="color:var(--green)"><strong>Purata:</strong> ${avg}%</div>
+      <div class="chip" style="color:var(--green)"><strong>Lulus:</strong> ${lulus}/15</div>
+    </div>
+    <div class="card" style="margin-bottom:20px"><div class="cb tw"><table>
+      <thead><tr><th class="c">Bil.</th><th>Nama Pelajar</th><th>No. Pendaftaran</th>${kH}
+        <th class="c">Jumlah<br><span style="font-weight:400;font-size:10px">(100%)</span></th><th class="c">Gred</th></tr></thead>
+      <tbody>
+        ${rows.map((r,i)=>`<tr><td class="c">${i+1}</td><td>${r.nama}</td><td style="font-size:12px">${r.no_pendaftaran}</td>${ko.map(k=>`<td class="c">${r.mm[k.id]??"-"}</td>`).join("")}<td class="c"><strong>${r.j}</strong></td><td class="c"><span class="tg t${r.g}">${r.g}</span></td></tr>`).join("")}
+        <tr class="tr-sum"><td colspan="3" style="text-align:right;padding-right:10px">Purata:</td>${kA}<td class="c">${avg}</td><td></td></tr>
+      </tbody>
+    </table></div></div>`;
+  });
+  document.getElementById("mc").innerHTML=html||"<p style='color:var(--muted);padding:20px'>Tiada kelas untuk penapis ini.</p>";
+}
+
+// ══════════════════════════════════════════
+// MODERASI
+// ══════════════════════════════════════════
+let modI=false;
+function initMod(){
+  if(modI)return;modI=true;
+  qry("SELECT id,kod_kelas FROM kelas ORDER BY kod_kelas").forEach(r=>{document.getElementById("mfk").add(new Option(r.kod_kelas,r.id));});
+  qry("SELECT DISTINCT nama FROM komponen ORDER BY urutan").forEach(r=>{document.getElementById("mfc").add(new Option(r.nama,r.nama));});
+  ["mfk","mfc"].forEach(id=>document.getElementById(id).addEventListener("change",renderMod));
+}
+function resetMod(){["mfk","mfc"].forEach(id=>document.getElementById(id).value="");renderMod();}
+function renderMod(){
+  const kid=document.getElementById("mfk").value,kf=document.getElementById("mfc").value;
+  const kls=kid?qry("SELECT k.*,ps.nama AS pensyarah,kj.nama AS kolej_nama FROM kelas k JOIN pensyarah ps ON k.pensyarah_id=ps.id JOIN kolej kj ON k.kolej=kj.kod WHERE k.id=?",[kid]):qry("SELECT k.*,ps.nama AS pensyarah,kj.nama AS kolej_nama FROM kelas k JOIN pensyarah ps ON k.pensyarah_id=ps.id JOIN kolej kj ON k.kolej=kj.kod ORDER BY k.kolej,k.kod_kelas");
+  let html="";
+  kls.forEach(kl=>{
+    const ko=qry("SELECT * FROM komponen WHERE kursus_kod=? ORDER BY urutan",[kl.kursus_kod]);
+    const pl=qry("SELECT * FROM pelajar WHERE kelas_id=? ORDER BY no_pendaftaran",[kl.id]);
+    const iN=kl.kursus_kod==="SBS10022",hc=iN?"purple":"blue";
+    let kH="";
+    ko.forEach(k=>{
+      if(kf&&kf!==k.nama)return;
+      const ml=pl.map(p=>{const m=q1("SELECT nilai FROM markah WHERE pelajar_id=? AND komponen_id=?",[p.id,k.id]);return{...p,n:m?m.nilai:0};}).sort((a,b)=>b.n-a.n);
+      const T=ml[0],S=ml[Math.floor(ml.length/2)],R=ml[ml.length-1];
+      kH+=`<div class="mc"><div class="mh ${hc}"><span class="mh-t">${k.nama}</span><span class="mh-w">Wajaran: ${k.wajaran}% · ${kl.kursus_kod}</span></div>
+        <div class="tw"><table><thead><tr><th>Tahap</th><th>Nama Pelajar</th><th>No. Pendaftaran</th><th class="c">Markah</th><th class="c">Gred</th></tr></thead><tbody>
+          ${[["T","▲ TINGGI",T],["S","● SEDERHANA",S],["R","▼ RENDAH",R]].map(([lv,lb,p])=>`
+          <tr class="m${lv}"><td><span class="ml ml${lv}">${lb}</span></td><td>${p.nama}</td><td style="font-size:11px">${p.no_pendaftaran}</td><td class="c"><strong>${p.n}</strong></td><td class="c"><span class="tg t${grd(p.n)}">${grd(p.n)}</span></td></tr>`).join("")}
+        </tbody></table></div>
+        <div class="msign">
+          <div class="msf"><label>Catatan</label><input type="text" placeholder="Catatan pensyarah / moderator..."></div>
+          <div class="msf"><label>Nama Pengesah</label><input type="text" placeholder="________________________________"></div>
+          <div class="msf"><label>Tarikh</label><input type="text" placeholder="____ / ____ / ________"></div>
+          <div class="msf"><label>Tandatangan</label><input type="text" placeholder="________________________________"></div>
+        </div></div>`;
+    });
+    if(!kH)return;
+    html+=`<div style="margin-bottom:26px"><div class="cr">
+      <div class="chip" style="font-weight:700;font-size:13px">${kl.kod_kelas}</div>
+      <div class="chip"><strong>Pensyarah:</strong> ${kl.pensyarah}</div>
+      <div class="chip"><strong>Kolej:</strong> ${kl.kolej_nama}</div>
+      <div class="chip"><strong>Kursus:</strong> <span class="tg ${iN?"tpurple":"tblue"}">${kl.kursus_kod}</span></div>
+    </div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:11px">${kH}</div></div>`;
+  });
+  document.getElementById("modc").innerHTML=html||"<p style='color:var(--muted);padding:20px'>Tiada data untuk pilihan ini.</p>";
+}
+
+// ══════════════════════════════════════════
+// LAPORAN
+// ══════════════════════════════════════════
+const GC={A:"#15803d",B:"#1d6fcc",C:"#b45309",D:"#c2410c",E:"#be123c"};
+function renderLaporan(){
+  const ts=qry("SELECT p.id,SUM(m.nilai*k.wajaran/100.0) AS t FROM pelajar p JOIN markah m ON m.pelajar_id=p.id JOIN komponen k ON k.id=m.komponen_id GROUP BY p.id");
+  const gA={A:0,B:0,C:0,D:0,E:0};ts.forEach(r=>gA[grd(r.t)]++);
+  const total=ts.length,nL=ts.filter(r=>r.t>=50).length,avgA=(ts.reduce((s,r)=>s+r.t,0)/total).toFixed(1);
+  let html=`<div class="srow">
+    <div class="sc cblue"><div class="sl">Pelajar</div><div class="sv">${total}</div></div>
+    <div class="sc cgreen"><div class="sl">Lulus</div><div class="sv">${nL}</div><div class="ss">${Math.round(nL/total*100)}%</div></div>
+    <div class="sc cred"><div class="sl">Gagal</div><div class="sv">${total-nL}</div><div class="ss">${Math.round((total-nL)/total*100)}%</div></div>
+    <div class="sc cteal"><div class="sl">Purata</div><div class="sv">${avgA}%</div></div></div>`;
+  const aK=qry("SELECT k.kod_kelas,k.kolej,ROUND(AVG(sub.t),1) AS avg FROM kelas k JOIN pelajar p ON p.kelas_id=k.id JOIN(SELECT p2.id,SUM(m.nilai*c.wajaran/100.0) AS t FROM pelajar p2 JOIN markah m ON m.pelajar_id=p2.id JOIN komponen c ON c.id=m.komponen_id GROUP BY p2.id) sub ON sub.id=p.id GROUP BY k.id ORDER BY k.kolej,k.kod_kelas");
+  html+=`<div class="g2">
+  <div class="card"><div class="ch"><span class="ct">Taburan Gred — Semua Kelas</span></div><div class="cb"><div class="bg">${Object.entries(gA).map(([g,n])=>{const pct=Math.round(n/total*100);return`<div class="br"><div class="bl">${g}</div><div class="bt"><div class="bf" style="width:${pct}%;background:${GC[g]}">${pct>8?n+" org":""}</div></div><div class="bc">${n}</div></div>`;}).join("")}</div></div></div>
+  <div class="card"><div class="ch"><span class="ct">Purata Per Kelas</span></div><div class="cb"><div class="bg">${aK.map(r=>{const c=r.kolej==="KKKTcS"?"#6d4bb4":"#1d6fcc";return`<div class="br"><div class="bl">${r.kod_kelas}</div><div class="bt"><div class="bf" style="width:${r.avg}%;background:${c}">${r.avg}%</div></div><div class="bc">${r.avg}%</div></div>`;}).join("")}</div></div></div></div>`;
+  SKL.forEach(kl=>{
+    const ko=qry("SELECT * FROM komponen WHERE kursus_kod=? ORDER BY urutan",[kl.ku]);
+    const pl=qry("SELECT * FROM pelajar WHERE kelas_id=?",[kl.id]);
+    const iN=kl.ku==="SBS10022";
+    const rows=pl.map(p=>{const mm={};qry("SELECT komponen_id,nilai FROM markah WHERE pelajar_id=?",[p.id]).forEach(m=>mm[m.komponen_id]=m.nilai);const j=jw(mm,ko);return{...p,mm,j,g:grd(j)};});
+    const avg=(rows.reduce((s,r)=>s+r.j,0)/rows.length).toFixed(1),mn=Math.min(...rows.map(r=>r.j)),mx=Math.max(...rows.map(r=>r.j)),lulus=rows.filter(r=>r.j>=50).length;
+    const gc={A:0,B:0,C:0,D:0,E:0};rows.forEach(r=>gc[r.g]++);
+    const psn=q1("SELECT p.nama FROM kelas k JOIN pensyarah p ON k.pensyarah_id=p.id WHERE k.id=?",[kl.id]);
+    html+=`<div class="cr">
+      <div class="chip" style="font-weight:700">${kl.kod}</div><div class="chip">${psn?.nama||""}</div>
+      <div class="chip"><span class="tg ${iN?"tpurple":"tblue"}">${kl.ku}</span></div>
+      <div class="chip">Purata: <strong>${avg}%</strong></div><div class="chip">Min: <strong>${mn}%</strong></div>
+      <div class="chip">Maks: <strong>${mx}%</strong></div>
+      <div class="chip" style="color:var(--green)">Lulus: <strong>${lulus}/15</strong></div>
+      <div class="chip" style="color:var(--red)">Gagal: <strong>${15-lulus}/15</strong></div>
+    </div>
+    <div class="g2" style="margin-bottom:16px">
+      <div class="card"><div class="ch"><span class="ct">Gred — ${kl.kod}</span></div><div class="cb"><div class="bg">${Object.entries(gc).map(([g,n])=>{const pct=Math.round(n/15*100);return`<div class="br"><div class="bl">${g}</div><div class="bt"><div class="bf" style="width:${pct}%;background:${GC[g]}">${n>0?n+" org":""}</div></div><div class="bc">${n}</div></div>`;}).join("")}</div></div></div>
+      <div class="card"><div class="ch"><span class="ct">Per Komponen — ${kl.kod}</span></div><div class="cb"><div class="bg">${ko.map(k=>{const a2=(rows.reduce((s,r)=>s+(r.mm[k.id]||0),0)/rows.length).toFixed(1);const c=iN?"#6d4bb4":"#1d6fcc";return`<div class="br"><div class="bl" style="min-width:62px">${k.nama}</div><div class="bt"><div class="bf" style="width:${a2}%;background:${c}">${a2}%</div></div><div class="bc">${a2}%</div></div>`;}).join("")}</div></div></div>
+    </div>`;
+  });
+  const psR=qry("SELECT p.nama,GROUP_CONCAT(k.kod_kelas,' · ') AS kl,GROUP_CONCAT(DISTINCT k.kolej) AS kj FROM pensyarah p JOIN kelas k ON k.pensyarah_id=p.id GROUP BY p.id ORDER BY p.nama");
+  html+=`<div style="font-weight:700;margin:14px 0 10px;font-size:14px">Laporan Pensyarah</div><div class="card"><div class="cb tw"><table><thead><tr><th>#</th><th>Pensyarah</th><th>Kelas</th><th>Kolej</th><th class="c">Pelajar</th><th class="c">Purata</th><th class="c">Kadar Lulus</th></tr></thead><tbody>
+  ${psR.map((r,i)=>{const st=q1("SELECT COUNT(DISTINCT pl.id) AS tot,ROUND(AVG(sub.t),1) AS avg,SUM(CASE WHEN sub.t>=50 THEN 1 ELSE 0 END) AS lulus FROM pelajar pl JOIN kelas k ON pl.kelas_id=k.id JOIN pensyarah ps ON k.pensyarah_id=ps.id JOIN(SELECT p2.id,SUM(m.nilai*c.wajaran/100.0) AS t FROM pelajar p2 JOIN markah m ON m.pelajar_id=p2.id JOIN komponen c ON c.id=m.komponen_id GROUP BY p2.id) sub ON sub.id=pl.id WHERE ps.nama=?",[r.nama]);const pct=st?Math.round(st.lulus/st.tot*100):0;return`<tr><td>${i+1}</td><td>${r.nama}</td><td>${r.kl}</td><td>${r.kj}</td><td class="c">${st?.tot||0}</td><td class="c"><strong>${st?.avg||0}%</strong></td><td class="c" style="color:var(--green)"><strong>${st?.lulus||0}/${st?.tot||0} (${pct}%)</strong></td></tr>`;}).join("")}
+  </tbody></table></div></div>`;
+  document.getElementById("lc").innerHTML=html;
+}
+
+// ══════════════════════════════════════════
+// CRUD: KELAS
+// ══════════════════════════════════════════
+function renderKelasPage(){
+  const adm=isAdmin();
+  const rows=qry("SELECT k.id,k.kod_kelas AS Kelas,k.program AS Program,k.kod_program AS Kod,kj.nama AS Kolej,p.nama AS Pensyarah,k.kursus_kod AS Kursus FROM kelas k JOIN pensyarah p ON k.pensyarah_id=p.id JOIN kolej kj ON k.kolej=kj.kod ORDER BY k.kolej,k.kod_kelas");
+  if(!rows.length){document.getElementById("kelas-t").innerHTML="<p style='color:var(--muted);padding:8px'>Tiada rekod.</p>";return;}
+  const cols=["Kelas","Program","Kod","Kolej","Pensyarah","Kursus"];
+  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}${adm?"<th class='c'>Tindakan</th>":""}</tr></thead><tbody>`;
+  rows.forEach(r=>{
+    h+=`<tr>${cols.map(c=>`<td>${r[c]??""}</td>`).join("")}`;
+    if(adm)h+=`<td class="c" style="white-space:nowrap"><button class="btn btn-warn btn-sm" onclick="openModal('kelas','edit',${r.id})">✏️ Edit</button> <button class="btn btn-danger btn-sm" onclick="cDel('kelas',${r.id},'${r.Kelas}')">🗑️</button></td>`;
+    h+=`</tr>`;
+  });
+  document.getElementById("kelas-t").innerHTML=h+"</tbody></table>";
+}
+
+// ══════════════════════════════════════════
+// CRUD: PENSYARAH
+// ══════════════════════════════════════════
+function renderPensyarahPage(){
+  const adm=isAdmin();
+  const rows=qry("SELECT p.id,p.nama AS Nama,p.kolej AS Kolej,GROUP_CONCAT(k.kod_kelas,' · ') AS [Kelas Diajar],COUNT(k.id) AS [Jumlah Kelas] FROM pensyarah p LEFT JOIN kelas k ON k.pensyarah_id=p.id GROUP BY p.id ORDER BY p.nama");
+  const cols=["Nama","Kolej","Kelas Diajar","Jumlah Kelas"];
+  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}${adm?"<th class='c'>Tindakan</th>":""}</tr></thead><tbody>`;
+  rows.forEach(r=>{
+    h+=`<tr>${cols.map(c=>`<td>${r[c]??""}</td>`).join("")}`;
+    if(adm)h+=`<td class="c" style="white-space:nowrap"><button class="btn btn-warn btn-sm" onclick="openModal('pensyarah','edit',${r.id})">✏️ Edit</button> <button class="btn btn-danger btn-sm" onclick="cDel('pensyarah',${r.id},\`${r.Nama}\`)">🗑️</button></td>`;
+    h+=`</tr>`;
+  });
+  document.getElementById("ps-t").innerHTML=h+"</tbody></table>";
+}
+
+// ══════════════════════════════════════════
+// CRUD: KURSUS & KOMPONEN
+// ══════════════════════════════════════════
+function renderKursusPage(){
+  const adm=isAdmin();
+  document.getElementById("ks-t").innerHTML=mkT(qry("SELECT kod AS [Kod Kursus],nama AS Nama,versi AS Versi FROM kursus"));
+  const rows=qry("SELECT c.id,c.kursus_kod AS Kursus,c.urutan AS No,c.nama AS Komponen,c.wajaran AS [Wajaran%] FROM komponen c ORDER BY c.kursus_kod,c.urutan");
+  const cols=["Kursus","No","Komponen","Wajaran%"];
+  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}${adm?"<th class='c'>Tindakan</th>":""}</tr></thead><tbody>`;
+  rows.forEach(r=>{
+    h+=`<tr>${cols.map(c=>`<td>${r[c]??""}</td>`).join("")}`;
+    if(adm)h+=`<td class="c" style="white-space:nowrap"><button class="btn btn-warn btn-sm" onclick="openModal('komponen','edit',${r.id})">✏️</button> <button class="btn btn-danger btn-sm" onclick="cDel('komponen',${r.id},\`${r.Komponen}\`)">🗑️</button></td>`;
+    h+=`</tr>`;
+  });
+  document.getElementById("ko-t").innerHTML=h+"</tbody></table>";
+}
+
+// ══════════════════════════════════════════
+// CRUD: PELAJAR
+// ══════════════════════════════════════════
+let pfI=false;
+function initPF(){
+  if(pfI)return;pfI=true;
+  qry("SELECT id,kod_kelas FROM kelas ORDER BY kod_kelas").forEach(r=>document.getElementById("pfk").add(new Option(r.kod_kelas,r.id)));
+  document.getElementById("pfk").addEventListener("change",renderPelajar);
+}
+function renderPelajar(){
+  const adm=isAdmin(),kid=document.getElementById("pfk").value;
+  const w=kid?"WHERE p.kelas_id=?":"";const p=kid?[kid]:[];
+  const rows=qry(`SELECT p.id,p.no_pendaftaran AS [No. Pendaftaran],p.nama AS Nama,k.kod_kelas AS Kelas,k.program AS Program,kj.nama AS Kolej FROM pelajar p JOIN kelas k ON p.kelas_id=k.id JOIN kolej kj ON k.kolej=kj.kod ${w} ORDER BY k.kod_kelas,p.no_pendaftaran`,p);
+  const cols=["No. Pendaftaran","Nama","Kelas","Program","Kolej"];
+  let h=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}${adm?"<th class='c'>Tindakan</th>":""}</tr></thead><tbody>`;
+  rows.forEach(r=>{
+    h+=`<tr>${cols.map(c=>`<td>${r[c]??""}</td>`).join("")}`;
+    if(adm)h+=`<td class="c" style="white-space:nowrap"><button class="btn btn-warn btn-sm" onclick="openModal('pelajar','edit',${r.id})">✏️ Edit</button> <button class="btn btn-danger btn-sm" onclick="cDel('pelajar',${r.id},\`${r.Nama}\`)">🗑️</button></td>`;
+    h+=`</tr>`;
+  });
+  document.getElementById("pl-t").innerHTML=h+"</tbody></table>";
+}
+
+// ══════════════════════════════════════════
+// TUGASAN PENSYARAH
+// ══════════════════════════════════════════
+function renderTugasan(){
+  if(!isAdmin()){document.getElementById("tugasan-c").innerHTML="<p style='color:var(--red)'>Akses ditolak.</p>";return;}
+  const kls=qry("SELECT id,kod_kelas FROM kelas ORDER BY kod_kelas");
+  const ps=qry("SELECT id,nama FROM pensyarah ORDER BY nama");
+  let h=`<div class="tug-grid">`;
+  kls.forEach(kl=>{
+    const cur=q1("SELECT pensyarah_id FROM kelas WHERE id=?",[kl.id]);
+    h+=`<div class="tug-card">
+      <div class="tug-kelas">${kl.kod_kelas}</div>
+      <div class="fr"><label>Pensyarah</label>
+        <select id="tug-${kl.id}">
+          ${ps.map(p=>`<option value="${p.id}"${p.id===cur?.pensyarah_id?" selected":""}>${p.nama}</option>`).join("")}
+        </select>
+      </div>
+      <button class="btn btn-admin" style="width:100%" onclick="saveTug(${kl.id})">💾 Simpan</button>
+    </div>`;
+  });
+  h+=`</div>`;
+  document.getElementById("tugasan-c").innerHTML=h;
+  renderTugSemak();
+}
+function saveTug(kid){
+  const psid=document.getElementById("tug-"+kid).value;
+  DB.run("UPDATE kelas SET pensyarah_id=? WHERE id=?",[psid,kid]);
+  renderTugSemak();toast("Tugasan pensyarah dikemas kini!");
+}
+function renderTugSemak(){
+  document.getElementById("tugasan-s").innerHTML=mkT(qry("SELECT k.kod_kelas AS Kelas,k.program AS Program,kj.nama AS Kolej,p.nama AS Pensyarah,k.kursus_kod AS Kursus FROM kelas k JOIN pensyarah p ON k.pensyarah_id=p.id JOIN kolej kj ON k.kolej=kj.kod ORDER BY k.kolej,k.kod_kelas"));
+}
+
+// ══════════════════════════════════════════
+// MODAL
+// ══════════════════════════════════════════
+function openModal(entity,mode,id=null){
+  if(!isAdmin()){toast("Akses ditolak.","err");return;}
+  let t="",b="",f="";
+  if(entity==="kelas"){
+    const ps=qry("SELECT id,nama FROM pensyarah ORDER BY nama");
+    const kj=qry("SELECT kod,nama FROM kolej ORDER BY kod");
+    const ku=qry("SELECT kod FROM kursus ORDER BY kod");
+    const rec=mode==="edit"?q1("SELECT * FROM kelas WHERE id=?",[id]):null;
+    t=(mode==="add"?"Tambah":"Edit")+" Kelas";
+    b=`<div class="fr"><label>Kod Kelas</label><input id="m-kod" value="${rec?.kod_kelas||""}"></div>
+      <div class="fr"><label>Program</label><input id="m-prog" value="${rec?.program||""}"></div>
+      <div class="fr"><label>Kod Program</label><input id="m-kp" value="${rec?.kod_program||""}"></div>
+      <div class="fr"><label>Kolej</label><select id="m-kj">${kj.map(k=>`<option value="${k.kod}"${k.kod===rec?.kolej?" selected":""}>${k.kod} — ${k.nama}</option>`).join("")}</select></div>
+      <div class="fr"><label>Pensyarah</label><select id="m-ps">${ps.map(p=>`<option value="${p.id}"${p.id===rec?.pensyarah_id?" selected":""}>${p.nama}</option>`).join("")}</select></div>
+      <div class="fr"><label>Kod Kursus</label><select id="m-ku">${ku.map(k=>`<option value="${k.kod}"${k.kod===rec?.kursus_kod?" selected":""}>${k.kod}</option>`).join("")}</select></div>
+      <div class="ferr" id="m-err"></div>`;
+    f=`<button class="btn btn-g" onclick="closeModal()">Batal</button><button class="btn btn-admin" onclick="svKelas(${mode==="edit"?id:"null"})">${mode==="edit"?"💾 Kemas Kini":"＋ Tambah"}</button>`;
+  } else if(entity==="pensyarah"){
+    const kj=qry("SELECT kod,nama FROM kolej ORDER BY kod");
+    const rec=mode==="edit"?q1("SELECT * FROM pensyarah WHERE id=?",[id]):null;
+    t=(mode==="add"?"Tambah":"Edit")+" Pensyarah";
+    b=`<div class="fr"><label>Nama Pensyarah</label><input id="m-nama" value="${rec?.nama||""}"></div>
+      <div class="fr"><label>Kolej</label><select id="m-kj">${kj.map(k=>`<option value="${k.kod}"${k.kod===rec?.kolej?" selected":""}>${k.kod} — ${k.nama}</option>`).join("")}</select></div>
+      <div class="ferr" id="m-err"></div>`;
+    f=`<button class="btn btn-g" onclick="closeModal()">Batal</button><button class="btn btn-admin" onclick="svPs(${mode==="edit"?id:"null"})">${mode==="edit"?"💾 Kemas Kini":"＋ Tambah"}</button>`;
+  } else if(entity==="kursus"){
+    t="Tambah Kursus";
+    b=`<div class="fr"><label>Kod Kursus</label><input id="m-kod" placeholder="cth: SBS10032"></div>
+      <div class="fr"><label>Nama</label><input id="m-nama" placeholder="cth: SAINS"></div>
+      <div class="fr"><label>Versi</label><input id="m-versi" placeholder="cth: Kod Baharu"></div>
+      <div class="ferr" id="m-err"></div>`;
+    f=`<button class="btn btn-g" onclick="closeModal()">Batal</button><button class="btn btn-admin" onclick="svKursus()">＋ Tambah</button>`;
+  } else if(entity==="komponen"){
+    const ku=qry("SELECT kod FROM kursus ORDER BY kod");
+    const rec=mode==="edit"?q1("SELECT * FROM komponen WHERE id=?",[id]):null;
+    t=(mode==="add"?"Tambah":"Edit")+" Komponen";
+    b=`<div class="fr"><label>Kod Kursus</label><select id="m-ku">${ku.map(k=>`<option value="${k.kod}"${k.kod===rec?.kursus_kod?" selected":""}>${k.kod}</option>`).join("")}</select></div>
+      <div class="fr"><label>Nama Komponen</label><input id="m-nama" value="${rec?.nama||""}"></div>
+      <div class="fr"><label>Wajaran (%)</label><input id="m-w" type="number" min="1" max="100" value="${rec?.wajaran||""}"></div>
+      <div class="fr"><label>Urutan</label><input id="m-u" type="number" min="1" value="${rec?.urutan||""}"></div>
+      <div class="ferr" id="m-err"></div>`;
+    f=`<button class="btn btn-g" onclick="closeModal()">Batal</button><button class="btn btn-admin" onclick="svKomp(${mode==="edit"?id:"null"})">${mode==="edit"?"💾 Kemas Kini":"＋ Tambah"}</button>`;
+  } else if(entity==="pelajar"){
+    const kls=qry("SELECT id,kod_kelas FROM kelas ORDER BY kod_kelas");
+    const rec=mode==="edit"?q1("SELECT * FROM pelajar WHERE id=?",[id]):null;
+    t=(mode==="add"?"Tambah":"Edit")+" Pelajar";
+    b=`<div class="fr"><label>Nama Pelajar</label><input id="m-nama" value="${rec?.nama||""}"></div>
+      <div class="fr"><label>No. Pendaftaran</label><input id="m-no" value="${rec?.no_pendaftaran||""}"></div>
+      <div class="fr"><label>Kelas</label><select id="m-kelas">${kls.map(k=>`<option value="${k.id}"${k.id===rec?.kelas_id?" selected":""}>${k.kod_kelas}</option>`).join("")}</select></div>
+      <div class="ferr" id="m-err"></div>`;
+    f=`<button class="btn btn-g" onclick="closeModal()">Batal</button><button class="btn btn-admin" onclick="svPelajar(${mode==="edit"?id:"null"})">${mode==="edit"?"💾 Kemas Kini":"＋ Tambah"}</button>`;
+  }
+  document.getElementById("modal-ttl").textContent=t;
+  document.getElementById("modal-body").innerHTML=b;
+  document.getElementById("modal-ft").innerHTML=f;
+  document.getElementById("modal-bd").classList.add("open");
+}
+function closeModal(){document.getElementById("modal-bd").classList.remove("open");}
+function closeModalOut(e){if(e.target===document.getElementById("modal-bd"))closeModal();}
+
+function v(id){return document.getElementById(id)?.value?.trim();}
+function ferr(msg){const e=document.getElementById("m-err");if(e)e.textContent=msg;}
+
+function svKelas(id){
+  const kod=v("m-kod"),prog=v("m-prog"),kp=v("m-kp"),kj=v("m-kj"),ps=v("m-ps"),ku=v("m-ku");
+  if(!kod||!prog||!kp){ferr("Sila isi semua medan.");return;}
+  try{if(id)DB.run("UPDATE kelas SET kod_kelas=?,program=?,kod_program=?,kolej=?,pensyarah_id=?,kursus_kod=? WHERE id=?",[kod,prog,kp,kj,ps,ku,id]);else DB.run("INSERT INTO kelas VALUES(?,?,?,?,?,?,?)",[nid("kelas"),kod,prog,kp,kj,ps,ku]);closeModal();renderKelasPage();toast(id?"Kelas dikemas kini!":"Kelas ditambah!");}catch(e){ferr("Ralat: "+e.message);}
+}
+function svPs(id){
+  const nama=v("m-nama"),kj=v("m-kj");
+  if(!nama){ferr("Sila isi nama.");return;}
+  try{if(id)DB.run("UPDATE pensyarah SET nama=?,kolej=? WHERE id=?",[nama,kj,id]);else DB.run("INSERT INTO pensyarah VALUES(?,?,?)",[nid("pensyarah"),nama,kj]);closeModal();renderPensyarahPage();toast(id?"Pensyarah dikemas kini!":"Pensyarah ditambah!");}catch(e){ferr("Ralat: "+e.message);}
+}
+function svKursus(){
+  const kod=v("m-kod"),nama=v("m-nama"),versi=v("m-versi");
+  if(!kod||!nama){ferr("Sila isi kod dan nama.");return;}
+  try{DB.run("INSERT INTO kursus VALUES(?,?,?)",[kod,nama,versi||""]);closeModal();renderKursusPage();toast("Kursus ditambah!");}catch(e){ferr("Ralat: "+e.message);}
+}
+function svKomp(id){
+  const ku=v("m-ku"),nama=v("m-nama"),w=parseInt(document.getElementById("m-w")?.value),u=parseInt(document.getElementById("m-u")?.value);
+  if(!nama||isNaN(w)||isNaN(u)){ferr("Sila isi semua medan.");return;}
+  try{if(id)DB.run("UPDATE komponen SET kursus_kod=?,nama=?,wajaran=?,urutan=? WHERE id=?",[ku,nama,w,u,id]);else DB.run("INSERT INTO komponen VALUES(?,?,?,?,?)",[nid("komponen"),ku,u,nama,w]);closeModal();renderKursusPage();toast(id?"Komponen dikemas kini!":"Komponen ditambah!");}catch(e){ferr("Ralat: "+e.message);}
+}
+function svPelajar(id){
+  const nama=v("m-nama"),no=v("m-no"),kelas=v("m-kelas");
+  if(!nama||!no){ferr("Sila isi nama dan no. pendaftaran.");return;}
+  try{if(id)DB.run("UPDATE pelajar SET nama=?,no_pendaftaran=?,kelas_id=? WHERE id=?",[nama,no,kelas,id]);else DB.run("INSERT INTO pelajar VALUES(?,?,?,?)",[nid("pelajar"),no,nama,kelas]);closeModal();renderPelajar();toast(id?"Pelajar dikemas kini!":"Pelajar ditambah!");}catch(e){ferr("Ralat: "+e.message);}
+}
+function cDel(entity,id,label){
+  document.getElementById("modal-ttl").textContent="Sahkan Pemadaman";
+  document.getElementById("modal-body").innerHTML=`<p style="font-size:14px">Padam <strong>${label}</strong>?</p><p style="color:var(--red);font-size:12px;margin-top:8px">⚠️ Tindakan ini tidak boleh dibatalkan.</p>`;
+  document.getElementById("modal-ft").innerHTML=`<button class="btn btn-g" onclick="closeModal()">Batal</button><button class="btn btn-danger" onclick="doDel('${entity}',${id},'${label.replace(/'/g,"\\'")}')">🗑️ Padam</button>`;
+  document.getElementById("modal-bd").classList.add("open");
+}
+function doDel(entity,id,label){
+  try{
+    if(entity==="kelas")DB.run("DELETE FROM kelas WHERE id=?",[id]);
+    else if(entity==="pensyarah")DB.run("DELETE FROM pensyarah WHERE id=?",[id]);
+    else if(entity==="komponen")DB.run("DELETE FROM komponen WHERE id=?",[id]);
+    else if(entity==="pelajar"){DB.run("DELETE FROM markah WHERE pelajar_id=?",[id]);DB.run("DELETE FROM pelajar WHERE id=?",[id]);}
+    closeModal();
+    if(entity==="kelas")renderKelasPage();
+    else if(entity==="pensyarah")renderPensyarahPage();
+    else if(entity==="komponen")renderKursusPage();
+    else if(entity==="pelajar")renderPelajar();
+    toast(label+" dipadam.","warn");
+  }catch(e){toast("Ralat: "+e.message,"err");}
+}
+
+// ══════════════════════════════════════════
+// SQL EXPLORER
+// ══════════════════════════════════════════
+function renderDBSchema(){
+  const tables=qry("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+  let h=`<div style="display:flex;gap:10px;flex-wrap:wrap">`;
+  tables.forEach(t=>{
+    const cols=qry(`PRAGMA table_info(${t.name})`);
+    h+=`<div style="min-width:155px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:12px"><div style="font-weight:700;margin-bottom:5px;color:var(--blue)">${t.name}</div>${cols.map(c=>`<div style="padding:1px 0"><span style="font-weight:600">${c.name}</span> <em style="font-size:10px;color:var(--muted)">${c.type}</em></div>`).join("")}</div>`;
+  });
+  document.getElementById("db-schema").innerHTML=h+"</div>";
+}
+const SQLS={
+  pelajar:`SELECT p.no_pendaftaran AS [No.Pendaftaran], p.nama AS Nama,\n  k.kod_kelas AS Kelas, k.kursus_kod AS Kursus\nFROM pelajar p JOIN kelas k ON p.kelas_id=k.id\nORDER BY k.kod_kelas, p.no_pendaftaran;`,
+  markah:`SELECT p.nama AS Pelajar, p.no_pendaftaran AS [No.Pendaftaran],\n  k.kod_kelas AS Kelas, c.nama AS Komponen, m.nilai AS Markah\nFROM markah m JOIN pelajar p ON m.pelajar_id=p.id\nJOIN kelas k ON p.kelas_id=k.id JOIN komponen c ON m.komponen_id=c.id\nORDER BY k.kod_kelas, p.no_pendaftaran, c.urutan;`,
+  moderasi:`SELECT k.kod_kelas AS Kelas, c.nama AS Komponen,\n  MAX(m.nilai) AS Markah_TINGGI, ROUND(AVG(m.nilai),1) AS SEDERHANA, MIN(m.nilai) AS Markah_RENDAH\nFROM markah m JOIN pelajar p ON m.pelajar_id=p.id\nJOIN kelas k ON p.kelas_id=k.id JOIN komponen c ON m.komponen_id=c.id\nGROUP BY k.id, c.id ORDER BY k.kod_kelas, c.urutan;`,
+  stats:`SELECT k.kod_kelas AS Kelas, k.kursus_kod AS Kursus,\n  COUNT(DISTINCT p.id) AS Pelajar, ROUND(AVG(sub.t),1) AS [Purata%],\n  SUM(CASE WHEN sub.t>=50 THEN 1 ELSE 0 END) AS Lulus,\n  SUM(CASE WHEN sub.t<50 THEN 1 ELSE 0 END) AS Gagal\nFROM kelas k JOIN pelajar p ON p.kelas_id=k.id\nJOIN (SELECT p2.id, SUM(m.nilai*c.wajaran/100.0) AS t FROM pelajar p2\n      JOIN markah m ON m.pelajar_id=p2.id JOIN komponen c ON c.id=m.komponen_id GROUP BY p2.id) sub ON sub.id=p.id\nGROUP BY k.id ORDER BY k.kod_kelas;`
+};
+function sqlP(n){document.getElementById("sql-in").value=SQLS[n]||"";runSQL();}
+function runSQL(){
+  const sql=document.getElementById("sql-in").value.trim();if(!sql)return;
+  try{
+    const res=DB.exec(sql);
+    if(!res.length){document.getElementById("sql-out").innerHTML=`<p style="color:var(--green);padding:10px">✅ Berjaya. Tiada baris dikembalikan.</p>`;return;}
+    const{columns:c,values:v}=res[0];
+    document.getElementById("sql-out").innerHTML=`<div style="font-size:11px;color:var(--muted);margin-bottom:5px">${v.length} baris dikembalikan</div><table><thead><tr>${c.map(x=>`<th>${x}</th>`).join("")}</tr></thead><tbody>${v.map(row=>`<tr>${row.map(x=>`<td>${x??""}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  }catch(e){document.getElementById("sql-out").innerHTML=`<p style="color:var(--red);padding:10px;font-family:monospace">❌ ${e.message}</p>`;}
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+async function init(){
+  try{
+    const lp=document.querySelector("#ls p"),ls2=document.querySelector("#ls small");
+    lp.textContent="Memuat sql.js WebAssembly...";
+    const SQL=await initSqlJs({locateFile:f=>`https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}`});
+    lp.textContent="Membina SQLite database...";
+    DB=await buildDB(SQL);
+    lp.textContent="Sedia...";
+    await new Promise(r=>setTimeout(r,300));
+    document.getElementById("bdg-kelas").textContent=q1("SELECT COUNT(*) AS n FROM kelas").n+" Kelas";
+    document.getElementById("bdg-pelajar").textContent=q1("SELECT COUNT(*) AS n FROM pelajar").n+" Pelajar";
+    document.getElementById("ls").style.display="none";
+    document.getElementById("login-screen").style.display="flex";
+  }catch(e){
+    document.querySelector("#ls p").textContent="⚠️ Ralat: "+e.message;
+    document.querySelector("#ls small").textContent="Pastikan sambungan internet aktif (cdnjs.cloudflare.com)";
+    console.error(e);
+  }
+}
+init();
+</script>
+</body>
+</html>
